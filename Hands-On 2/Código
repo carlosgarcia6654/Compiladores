@@ -1,0 +1,214 @@
+#include <stdio.h>
+#include <ctype.h> // importa funciones para validar espacios, caracteres o valores alpha
+#include <string.h>
+
+typedef enum {Q0, Q1, Q2, Q3, Q4, Q5, Q6, Q7, Q8, Q9, Q10, Q11, Q12, Q13, Q14, ERROR, ACEPTADO} Estado;
+
+int validarJSON(const char *json) {
+    Estado q = Q0;
+    int i = 0; // Recorre caracter
+    int index = 0; // Recorre internamente cada carácter para saber el indice de las palabras
+    int f_name = 0; // Bandera para señalar que se cumplió 
+    int l_name = 0;
+    int v_started = 0;
+
+    while (json[i] != '\0' && q != ERROR && q != ACEPTADO) {
+        char c = json[i];
+        switch(q) {
+            case Q0: 
+                if(c == '{') q = Q1; 
+                else if(!isspace(c)) q = ERROR; 
+                break;
+
+            // Q1: esperar "employees"
+            case Q1:
+                if(c == '"') q = Q2; 
+                else if(!isspace(c)) q = ERROR;
+                break;
+
+            // Q2: validar "employees"
+            case Q2:
+                if(index == 0 && c == 'e') { q = Q2; index++; }
+                else if(index == 1 && c == 'm') { q = Q2; index++; }
+                else if(index == 2 && c == 'p') { q = Q2; index++; }
+                else if(index == 3 && c == 'l') { q = Q2; index++; }
+                else if(index == 4 && c == 'o') { q = Q2; index++; }
+                else if(index == 5 && c == 'y') { q = Q2; index++; }
+                else if(index == 6 && c == 'e') { q = Q2; index++; }
+                else if(index == 7 && c == 'e') { q = Q2; index++; }
+                else if(index == 8 && c == 's') { q = Q2; index++; }
+                else if(index == 9 && c == '"') q = Q3;
+                else q = ERROR;
+                break;
+
+            case Q3:
+                if(c == ':') 
+                    q = Q4; 
+                else if(!isspace(c)) 
+                    q = ERROR; 
+                break;
+
+            case Q4: 
+                if(c == '[') 
+                    q = Q5; 
+                else if(!isspace(c)) 
+                    q = ERROR; 
+                break;
+            
+            // Q5: inicio de empleado o arreglo vacío
+            case Q5: 
+                if(c == '{') 
+                    q = Q6; 
+                else if(c == ']') 
+                    q = Q14; 
+                else if(!isspace(c)) 
+                    q = ERROR;
+                break;
+
+            // Q6: inicio de clave (firstName o lastName)
+            case Q6:
+                if(c == '"') { 
+                    q = Q7; 
+                    index = 0;
+                    f_name = 0;
+                    l_name = 0;
+                }
+                else if(!isspace(c))
+                    q = ERROR; 
+                break;
+
+            // Q7: validar "firstName" o "lastName"
+            case Q7: 
+                if(index == 0 && c == 'f') { q = Q7; index = 1; }
+                else if(index == 1 && c == 'i') { q = Q7; index = 2; }
+                else if(index == 2 && c == 'r') { q = Q7; index = 3; }
+                else if(index == 3 && c == 's') { q = Q7; index = 4; }
+                else if(index == 4 && c == 't') { q = Q7; index = 5; }
+                else if(index == 5 && c == 'N') { q = Q7; index = 6; }
+                else if(index == 6 && c == 'a') { q = Q7; index = 7; }
+                else if(index == 7 && c == 'm') { q = Q7; index = 8; }
+                else if(index == 8 && c == 'e') { q = Q7; index = 9; f_name = 1; }
+                
+                else if(index == 0 && c == 'l') { q = Q7; index = 10; }
+                else if(index == 10 && c == 'a') { q = Q7; index = 11; }
+                else if(index == 11 && c == 's') { q = Q7; index = 12; }
+                else if(index == 12 && c == 't') { q = Q7; index = 13; }
+                else if(index == 13 && c == 'N') { q = Q7; index = 14; }
+                else if(index == 14 && c == 'a') { q = Q7; index = 15; }
+                else if(index == 15 && c == 'm') { q = Q7; index = 16; }
+                else if(index == 16 && c == 'e') { q = Q7; index = 17; l_name = 1; }
+                
+                else if((f_name && index == 9 && c == '"') || (l_name && index == 17 && c == '"')) q = Q8;
+                else q = ERROR;
+
+                break;
+
+            case Q8:
+                if(c == ':') q = Q9; 
+                else if(!isspace(c)) q = ERROR; 
+                break;
+            
+            // Q9: inicio de valor
+            case Q9: 
+                if(c == '"') { 
+                    q = Q10; 
+                    v_started = 0;
+                }
+                else if(!isspace(c)) q = ERROR; 
+                break;
+
+            // Q10: lectura de valor (alfanumérica, comenzando con letra)
+            case Q10: 
+                if(!v_started) {
+                    // Primera letra del valor debe ser alfabética
+                    if(isalpha((unsigned char)c)) { 
+                        q = Q10; 
+                        v_started = 1;
+                    } else {
+                        q = ERROR;
+                    }
+                } else {
+                    // Resto puede ser alfanumérico
+                    if(isalnum((unsigned char)c)) {
+                        q = Q10;
+                    } else if(c == '"') {
+                        q = Q11;
+                    } else {
+                        q = ERROR;
+                    }
+                }
+                break;
+
+            
+            case Q11: // después del valor
+                if(c == ',') q = Q6; // siguiente clave
+                else if(c == '}') q = Q12; // fin empleado
+                else if(!isspace(c)) q = ERROR;
+                break;
+
+            case Q12: // después de cerrar empleado
+                if(c == ',') q = Q5; // siguiente empleado
+                else if(c == ']') q = Q13; // fin arreglo
+                else if(!isspace(c)) q = ERROR;
+                break;
+                
+            case Q13: // después de cerrar arreglo
+                if(c == '}') q = ACEPTADO;
+                else if(!isspace(c)) q = ERROR;
+                break;
+
+            case Q14: // arreglo vacío -> cerrar objeto principal
+                if(c == '}') q = ACEPTADO;
+                else if(!isspace(c)) q = ERROR;
+                break;
+
+            default: q = ERROR; break;
+        }
+        i++; //iterador de caracteres
+    }
+
+    // Verificar estado final
+    if (q == ACEPTADO) {
+        while (json[i] != '\0') {
+            if (!isspace((unsigned char)json[i])) {
+                return 0;
+            }
+            i++;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+int main() {
+    const char *json1 = "{ \"employees\":["
+                       "{ \"firstName\":\"John\", \"lastName\":\"Doe\" },"
+                       "{ \"firstName\":\"Anna\", \"lastName\":\"Smith\" },"
+                       "{ \"firstName\":\"Peter\", \"lastName\":\"Jones\" }"
+                       "]}";
+    
+    const char *json2 = "{ \"employees\":[ { \"firstName\":\"John\", \"lastName\":\"Doe\" } ] }";
+    
+    const char *json3 = "{ \"employees\":["
+                       "{ \"firstName\":\"1John\", \"lastName\":\"Doe\" },"
+                       "{ \"firstName\":\"Anna\", \"lastName\":\"Smith\" },"
+                       "{ \"firstName\":\"Peter\", \"lastName\":\"Jones\" }"
+                       "]}";
+
+    printf("JSON 1: ");
+    if(validarJSON(json1)) 
+        printf("válido\n");
+    else printf("inválido\n");
+
+    printf("JSON 2: ");
+    if(validarJSON(json2)) 
+        printf("válido\n");
+    else printf("inválido\n");
+
+    printf("JSON 3: ");
+    if(validarJSON(json3)) 
+        printf("válido\n");
+    else printf("inválido\n");
+
+    return 0;
+}
